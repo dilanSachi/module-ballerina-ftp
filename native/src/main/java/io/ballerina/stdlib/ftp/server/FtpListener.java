@@ -59,11 +59,10 @@ public class FtpListener implements RemoteFileSystemListener {
     private static final Logger log = LoggerFactory.getLogger(FtpListener.class);
     private final Runtime runtime;
     private Map<String, BObject> registeredServices = new HashMap<>();
-    private final BObject clientEndpoint;
+    private BObject clientEndpoint;
 
-    FtpListener(Runtime runtime, BObject clientEndpoint) {
+    FtpListener(Runtime runtime) {
         this.runtime = runtime;
-        this.clientEndpoint = clientEndpoint;
     }
 
     @Override
@@ -193,5 +192,9 @@ public class FtpListener implements RemoteFileSystemListener {
         if (service != null && service.getType() != null && service.getType().getName() != null) {
             registeredServices.put(service.getType().getName(), service);
         }
+    }
+
+    public void setClientEndpoint(BObject clientEndpoint) {
+        this.clientEndpoint = clientEndpoint;
     }
 }

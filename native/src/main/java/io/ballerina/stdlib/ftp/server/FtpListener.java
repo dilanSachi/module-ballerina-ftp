@@ -59,9 +59,11 @@ public class FtpListener implements RemoteFileSystemListener {
     private static final Logger log = LoggerFactory.getLogger(FtpListener.class);
     private final Runtime runtime;
     private Map<String, BObject> registeredServices = new HashMap<>();
+    private final BObject clientEndpoint;
 
-    FtpListener(Runtime runtime) {
+    FtpListener(Runtime runtime, BObject clientEndpoint) {
         this.runtime = runtime;
+        this.clientEndpoint = clientEndpoint;
     }
 
     @Override
@@ -82,7 +84,8 @@ public class FtpListener implements RemoteFileSystemListener {
 
                                         @Override
                                         public void notifyFailure(BError error) {
-                                            log.error("Error while invoking FTP onMessage method.");
+                                            log.error("Error while invoking FTP onMessage method."
+                                                    + clientEndpoint.toString());
                                         }
                                     }, null, null, parameters, true);
                         }

@@ -19,11 +19,13 @@
 package io.ballerina.stdlib.ftp.server;
 
 import io.ballerina.runtime.api.Runtime;
+import io.ballerina.runtime.api.creators.ValueCreator;
 import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
+import io.ballerina.stdlib.ftp.client.FtpClient;
 import io.ballerina.stdlib.ftp.exception.BallerinaFtpException;
 import io.ballerina.stdlib.ftp.exception.RemoteFileSystemConnectorException;
 import io.ballerina.stdlib.ftp.transport.RemoteFileSystemConnectorFactory;
@@ -31,6 +33,7 @@ import io.ballerina.stdlib.ftp.transport.impl.RemoteFileSystemConnectorFactoryIm
 import io.ballerina.stdlib.ftp.transport.server.connector.contract.RemoteFileSystemServerConnector;
 import io.ballerina.stdlib.ftp.util.FtpConstants;
 import io.ballerina.stdlib.ftp.util.FtpUtil;
+import io.ballerina.stdlib.ftp.util.ModuleUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -56,7 +59,8 @@ public class FtpListenerHelper {
         try {
             Map<String, String> paramMap = getServerConnectorParamMap(serviceEndpointConfig);
             RemoteFileSystemConnectorFactory fileSystemConnectorFactory = new RemoteFileSystemConnectorFactoryImpl();
-            final FtpListener listener = new FtpListener(Runtime.getCurrentRuntime());
+            BObject clientEndpoint = createClientEndpoint(serviceEndpointConfig);
+            final FtpListener listener = new FtpListener(Runtime.getCurrentRuntime(), clientEndpoint);
             RemoteFileSystemServerConnector serverConnector = fileSystemConnectorFactory
                     .createServerConnector(paramMap, listener);
             ftpListener.addNativeData(FtpConstants.FTP_SERVER_CONNECTOR, serverConnector);
@@ -67,6 +71,12 @@ public class FtpListenerHelper {
             String detail = (rootCause != null) ? rootCause.getMessage() : null;
             return FtpUtil.createError(e.getMessage(), detail, Error.errorType());
         }
+    }
+
+    private static BObject createClientEndpoint(BMap<BString, Object> serviceEndpointConfig) {
+        BObject bObject = ValueCreator.createObjectValue(ModuleUtils.getModule(), "Client");
+        FtpClient.initClientEndpoint(bObject, serviceEndpointConfig);
+        return bObject;
     }
 
     public static Object register(BObject ftpListener, BObject service) {

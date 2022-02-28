@@ -50,6 +50,7 @@ import java.util.Set;
 import static io.ballerina.stdlib.ftp.server.FtpListenerHelper.findRootCause;
 import static io.ballerina.stdlib.ftp.util.FtpConstants.ON_FILE_CHANGE_REMOTE_FUNCTION;
 import static io.ballerina.stdlib.ftp.util.FtpUtil.ErrorType.Error;
+import static io.ballerina.stdlib.ftp.util.FtpUtil.getOnFileChangeMethod;
 
 /**
  * FTP File System connector listener for Ballerina.
@@ -71,23 +72,37 @@ public class FtpListener implements RemoteFileSystemListener {
             RemoteFileSystemEvent event = (RemoteFileSystemEvent) remoteFileSystemBaseMessage;
             BMap<BString, Object> parameters = getSignatureParameters(event);
             if (runtime != null) {
-                for (BObject service : registeredServices.values()) {
-                    MethodType[] methodTypes = service.getType().getMethods();
-                    for (MethodType remoteFunc : methodTypes) {
-                        if (remoteFunc.getName().equals(ON_FILE_CHANGE_REMOTE_FUNCTION)) {
-                            runtime.invokeMethodAsyncConcurrently(service, ON_FILE_CHANGE_REMOTE_FUNCTION, null,
-                                    null, new Callback() {
-                                        @Override
-                                        public void notifySuccess(Object o) {
-                                        }
+                Callback callback = new Callback() {
+                    @Override
+                    public void notifySuccess(Object o) {
+                    }
 
-                                        @Override
-                                        public void notifyFailure(BError error) {
-                                            log.error("Error while invoking FTP onMessage method."
-                                                    + clientEndpoint.toString());
-                                        }
-                                    }, null, null, parameters, true);
+                    @Override
+                    public void notifyFailure(BError error) {
+                        log.error("Error while invoking FTP onMessage method."
+                                + clientEndpoint.toString());
+                    }
+                };
+                for (BObject service : registeredServices.values()) {
+                    MethodType methodType = getOnFileChangeMethod(service);
+                    if (methodType != null) {
+                        if (methodType.getParameters().length == 1) {
+                            runtime.invokeMethodAsyncConcurrently(service, ON_FILE_CHANGE_REMOTE_FUNCTION, null,
+                                    null, callback, null, null, parameters, false);
+                        } else if (methodType.getParameters().length == 2) {
+                            switch (getParameterOrder(methodType)) {
+                                case 1:
+                                    runtime.invokeMethodAsyncConcurrently(service, ON_FILE_CHANGE_REMOTE_FUNCTION, null,
+                                            null, callback, null, null, parameters, true, clientEndpoint, true);
+                                    break;
+                                default:
+                                    runtime.invokeMethodAsyncConcurrently(service, ON_FILE_CHANGE_REMOTE_FUNCTION, null,
+                                            null, callback, null, null, parameters, true);
+                                    break;
+                            }
                         }
+                    } else {
+                        log.error("Runtbleh bleh bleh.");
                     }
                 }
             } else {
@@ -95,6 +110,11 @@ public class FtpListener implements RemoteFileSystemListener {
             }
         }
         return true;
+    }
+
+    private int getParameterOrder(MethodType methodType) {
+        methodType.getParameters();
+        return 1;
     }
 
     private BMap<BString, Object> getSignatureParameters(RemoteFileSystemEvent fileSystemEvent) {
@@ -196,5 +216,9 @@ public class FtpListener implements RemoteFileSystemListener {
 
     public void setClientEndpoint(BObject clientEndpoint) {
         this.clientEndpoint = clientEndpoint;
+    }
+
+    public BObject getClientEndpoint() {
+        return clientEndpoint;
     }
 }

@@ -81,4 +81,5 @@ public class FtpConstants {
 
     public static final String ON_FILE_CHANGE_REMOTE_FUNCTION = "onFileChange";
 
+    public static final String FTP_SERVICE_ENDPOINT_CONFIG = "serviceEndpointConfig";
 }

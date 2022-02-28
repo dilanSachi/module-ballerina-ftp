@@ -41,7 +41,7 @@ listener Listener secureRemoteServer = check new({
 });
 
 service "ftpServerConnector" on secureRemoteServer {
-    function onFileChange(WatchEvent event) {
+    remote function onFileChange(WatchEvent event, Client 'client) returns error? {
         secureAddedFileCount = event.addedFiles.length();
         secureDeletedFileCount = event.deletedFiles.length();
         secureWatchEventReceived = true;
@@ -52,6 +52,9 @@ service "ftpServerConnector" on secureRemoteServer {
         foreach string deletedFile in event.deletedFiles {
             log:printInfo("Deleted file path: " + deletedFile);
         }
+
+        FileInfo[] ff = check 'client->list("/");
+        log:printInfo("Printin files --------- " + ff.toString());
     }
 }
 

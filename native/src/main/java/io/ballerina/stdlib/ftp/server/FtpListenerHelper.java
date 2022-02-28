@@ -20,6 +20,7 @@ package io.ballerina.stdlib.ftp.server;
 
 import io.ballerina.runtime.api.Runtime;
 import io.ballerina.runtime.api.creators.ValueCreator;
+import io.ballerina.runtime.api.types.MethodType;
 import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
@@ -39,7 +40,10 @@ import java.util.Map;
 import java.util.Objects;
 
 import static io.ballerina.stdlib.ftp.util.FtpConstants.FTP_CLIENT;
+import static io.ballerina.stdlib.ftp.util.FtpConstants.FTP_SERVER_CONNECTOR;
+import static io.ballerina.stdlib.ftp.util.FtpConstants.FTP_SERVICE_ENDPOINT_CONFIG;
 import static io.ballerina.stdlib.ftp.util.FtpUtil.ErrorType.Error;
+import static io.ballerina.stdlib.ftp.util.FtpUtil.getOnFileChangeMethod;
 
 /**
  * Helper class for listener functions.
@@ -62,9 +66,8 @@ public class FtpListenerHelper {
             final FtpListener listener = new FtpListener(Runtime.getCurrentRuntime());
             RemoteFileSystemServerConnector serverConnector = fileSystemConnectorFactory
                     .createServerConnector(paramMap, listener);
-            BObject clientEndpoint = createClientEndpoint(serviceEndpointConfig);
-            listener.setClientEndpoint(clientEndpoint);
-            ftpListener.addNativeData(FtpConstants.FTP_SERVER_CONNECTOR, serverConnector);
+            ftpListener.addNativeData(FTP_SERVER_CONNECTOR, serverConnector);
+            ftpListener.addNativeData(FTP_SERVICE_ENDPOINT_CONFIG, serviceEndpointConfig);
             // This is a temporary solution
             return null;
         } catch (Exception e) {
@@ -76,9 +79,24 @@ public class FtpListenerHelper {
 
     public static Object register(BObject ftpListener, BObject service) {
         RemoteFileSystemServerConnector ftpConnector = (RemoteFileSystemServerConnector) ftpListener.getNativeData(
-                FtpConstants.FTP_SERVER_CONNECTOR);
+                FTP_SERVER_CONNECTOR);
         FtpListener listener = ftpConnector.getFtpListener();
         listener.addService(service);
+
+        MethodType methodType = getOnFileChangeMethod(service);
+        if (methodType != null && methodType.getParameters().length == 2) {
+            if (listener.getClientEndpoint() == null) {
+                BMap serviceEndpointConfig  = (BMap) ftpListener.getNativeData(FTP_SERVICE_ENDPOINT_CONFIG);;
+                BObject clientEndpoint = createClientEndpoint(serviceEndpointConfig);
+                if (clientEndpoint instanceof BError) {
+                    BError endpointError = (BError) clientEndpoint;
+                    return FtpUtil.createError(endpointError.getMessage(), endpointError.getDetails().toString(),
+                            Error.errorType());
+                } else {
+                    listener.setClientEndpoint(clientEndpoint);
+                }
+            }
+        }
         return null;
     }
 
@@ -91,7 +109,7 @@ public class FtpListenerHelper {
         return rootCause;
     }
 
-    private static Map<String, String> getServerConnectorParamMap(BMap serviceEndpointConfig)
+    private static Map<String, String> getServerConnectorParamMap(BMap<BString, Object> serviceEndpointConfig)
             throws BallerinaFtpException {
         Map<String, String> params = new HashMap<>(12);
         BMap auth = serviceEndpointConfig.getMapValue(StringUtils.fromString(
@@ -119,7 +137,7 @@ public class FtpListenerHelper {
         return params;
     }
 
-    private static void addStringProperty(BMap config, Map<String, String> params) {
+    private static void addStringProperty(BMap<BString, Object> config, Map<String, String> params) {
         BString namePatternString = config.getStringValue(StringUtils.fromString(
                 FtpConstants.ENDPOINT_CONFIG_FILE_PATTERN));
         String fileNamePattern = (namePatternString != null && !namePatternString.getValue().isEmpty()) ?
@@ -129,7 +147,7 @@ public class FtpListenerHelper {
 
     public static Object poll(BObject ftpListener) {
         RemoteFileSystemServerConnector connector = (RemoteFileSystemServerConnector) ftpListener.
-                getNativeData(FtpConstants.FTP_SERVER_CONNECTOR);
+                getNativeData(FTP_SERVER_CONNECTOR);
         try {
             connector.poll();
         } catch (RemoteFileSystemConnectorException e) {
@@ -140,7 +158,7 @@ public class FtpListenerHelper {
 
     public static Object deregister(BObject ftpListener, BObject service) {
         try {
-            Object serverConnectorObject = ftpListener.getNativeData(FtpConstants.FTP_SERVER_CONNECTOR);
+            Object serverConnectorObject = ftpListener.getNativeData(FTP_SERVER_CONNECTOR);
             if (serverConnectorObject instanceof RemoteFileSystemServerConnector) {
                 RemoteFileSystemServerConnector serverConnector
                         = (RemoteFileSystemServerConnector) serverConnectorObject;
@@ -154,7 +172,7 @@ public class FtpListenerHelper {
             String detail = (rootCause != null) ? rootCause.getMessage() : null;
             return FtpUtil.createError(e.getMessage(), detail, Error.errorType());
         } finally {
-            ftpListener.addNativeData(FtpConstants.FTP_SERVER_CONNECTOR, null);
+            ftpListener.addNativeData(FTP_SERVER_CONNECTOR, null);
         }
         return null;
     }
